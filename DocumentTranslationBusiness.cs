@@ -25,6 +25,10 @@ namespace DocumentTranslationService.Core
         /// Prevent deletion of storage container. For debugging.
         /// </summary>
         public bool Nodelete { get; set; } = false;
+        /// <summary>
+        /// Recurse through subfolders
+        /// </summary>
+        public bool Recurse { get; set; }
 
         /// <summary>
         /// Fires when errors were encountered in the translation run
@@ -117,12 +121,26 @@ namespace DocumentTranslationService.Core
 
             #region Build the list of files to translate
             List<string> sourcefiles = new();
-            foreach (string filename in filestotranslate)
+            foreach (string path in filestotranslate)
             {
-                if ((File.GetAttributes(filename) & FileAttributes.Directory) == FileAttributes.Directory)
-                    foreach (var file in Directory.EnumerateFiles(filename))
+                if ((File.GetAttributes(path) & FileAttributes.Directory) == FileAttributes.Directory)
+                    foreach (var file in Directory.EnumerateFiles(path))
                         sourcefiles.Add(file);
-                else sourcefiles.Add(filename);
+                else sourcefiles.Add(path);
+                if (Recurse)
+                {
+                    var directories = Directory.EnumerateDirectories(path);
+                    if (directories is not null)
+                    {
+                        foreach (var directory in directories)
+                        {
+                            string targetF;
+                            if (string.IsNullOrEmpty(targetFolder)) targetF = null;
+                            else targetF = targetFolder + Path.DirectorySeparatorChar + directory;
+                            await RunAsync(new List<string> { directory }, fromlanguage, tolanguages, glossaryfiles, targetF);
+                        }
+                    }
+                }
             }
 
             await initialize;
